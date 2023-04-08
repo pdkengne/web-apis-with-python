@@ -1,66 +1,56 @@
-from zipfile import ZipFile
-import io
-from bin.filters import apply_filter
-from typing import List
-from fastapi import FastAPI, File, UploadFile, Request, BackgroundTasks
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI
+from datetime import datetime
+from typing import Optional
 
+from fastapi.encoders import jsonable_encoder
+from model.model import Task, TaskList
+import model.taskman as taskman
 
 app = FastAPI()
 
-# Read the PIL document to find out which filters are available out-of the box
-filters_available = [
-    "blur",
-    "contour",
-    "detail",
-    "edge_enhance",
-    "edge_enhance_more",
-    "emboss",
-    "find_edges",
-    "sharpen",
-    "smooth",
-    "smooth_more",
-]
 
-
-@app.api_route("/", methods=["GET", "POST"])
-async def index():
+@app.get("/api/tasks")
+async def get_tasks():
+    """TODO
+    Fetch the list of all tasks
     """
-    Return the usage instructions that specifies
-    1. which filters are available, and
-    2. the method format
+    return await taskman.get_tasks()
+
+
+@app.get("/api/tasks/{id}")
+async def get_task(id: int):
+    """TODO
+    Fetch the task by id
     """
-    response = {
-        "filters_available": filters_available,
-        "usage": {"http_method": "POST", "URL": "/<filter_available>/"},
-    }
-    return jsonable_encoder(response)
+    return await taskman.get_tasks( id )
 
 
-@app.post("/{filter}")
-async def image_filter(filter: str, images: List[UploadFile] = File(...)):
+@app.post("/api/tasks/create")
+async def create_task(task: Task):
+    """TODO
+    1. Create a new task and
+    2. Return the details of task
     """
-    1. Checks if the provided filter is available, if not, return an error
-    2. Check if a file has been provided in the POST request, if not return an error
-    3. Apply the filter using apply_filter() method from bin.filters
-    4. Return the filtered image as response
+    id = await taskman.create_task( task )
+    return await taskman.get_tasks( id )
+
+
+@app.put("/api/tasks/{id}/update")
+async def update_task(id: int, task: Task):
+    """TODO
+    1. Update the task by id
+    2. Return the updated task
     """
-    if filter not in filters_available:
-        response = {"error": "incorrect filter"}
-        return jsonable_encoder(response)
+    await taskman.update_task( id , task )
+    return await taskman.get_tasks( id )
 
-    buffer = io.BytesIO()
-    zipObject = ZipFile(buffer, mode="w")
 
-    for image in images:
-        filtered_image = await apply_filter(image.file, filter)
-        zipObject.writestr(image.filename, filtered_image.read())
-
-    zipObject.close()
-
-    buffer.seek(0)
-    response = StreamingResponse(buffer, media_type="application/zip")
-    response.headers["Content-Disposition"] = "attachment; filename=images.zip"
-
-    return response
+@app.delete("/api/tasks/{id}/delete")
+async def delete_task(id: int):
+    """TODO
+    1. Delete the task by id
+    2. Return a confirmation of deletion
+    """
+    id = await taskman.delete_task( id )
+    response = { id : "Task successfully deleted" }
+    return jsonable_encoder( response )
